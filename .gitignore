@@ -1,0 +1,27 @@
+# Ambientes
+venv/
+__pycache__/
+*.pyc
+
+
+homologacao/temp/
+homologacao/dataset/
+homologacao/dataset_normalizado/
+homologacao/dataset_augmented/
+homologacao/trainer/datasets/
+homologacao/trainer/modelos/
+homologacao/trainer/datasets/
+homologacao/logs/
+
+*.mp4
+*.npy
+*.npz
+*.keras
+*.h5
+
+# Modelos treinados
+homologacao/trainer/modelos/
+*.npy
+*.npz
+*.keras
+*.h5

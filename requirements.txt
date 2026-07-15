@@ -1,0 +1,10 @@
+tensorflow==2.15.0
+mediapipe==0.10.14
+opencv-python==4.9.0.80
+customtkinter==5.2.2
+Pillow==10.4.0
+numpy==1.26.4
+pyttsx3==2.90
+matplotlib==3.8.4
+protobuf==4.25.3
+pip install edge-tts playsound
