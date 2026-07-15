@@ -1,69 +1,174 @@
+import cv2
 import mediapipe as mp
 
 
-mp_hands = mp.solutions.hands
-mp_draw = mp.solutions.drawing_utils
+# ============================================================
+# MEDIAPIPE HOLISTIC
+# ============================================================
+
+mp_holistic = mp.solutions.holistic
+mp_drawing = mp.solutions.drawing_utils
 
 
-hands = mp_hands.Hands(
-    max_num_hands=2,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
+holistic = mp_holistic.Holistic(
+    static_image_mode=False,
+    model_complexity=1,
+    smooth_landmarks=True,
+    enable_segmentation=False,
+    refine_face_landmarks=False,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
 )
 
 
+# ============================================================
+# DETECÇÃO
+# ============================================================
+
 def detectar_mao(frame):
 
-    frame_rgb = mp.solutions.hands.Hands
+    if frame is None:
+        return None
 
-    imagem = frame.copy()
-
-    resultado = hands.process(
-        imagem
+    frame_rgb = cv2.cvtColor(
+        frame,
+        cv2.COLOR_BGR2RGB
     )
+
+    # Melhora um pouco o desempenho durante o processamento
+    frame_rgb.flags.writeable = False
+
+    resultado = holistic.process(
+        frame_rgb
+    )
+
+    frame_rgb.flags.writeable = True
 
     return resultado
 
 
+# ============================================================
+# DESENHO
+# ============================================================
 
 def desenhar_mao(frame, resultado):
 
-    if resultado.multi_hand_landmarks:
+    if frame is None or resultado is None:
+        return frame
 
-        for mao in resultado.multi_hand_landmarks:
+    # Mão esquerda
+    if resultado.left_hand_landmarks:
 
-            mp_draw.draw_landmarks(
-                frame,
-                mao,
-                mp_hands.HAND_CONNECTIONS
-            )
+        mp_drawing.draw_landmarks(
+            frame,
+            resultado.left_hand_landmarks,
+            mp_holistic.HAND_CONNECTIONS
+        )
+
+    # Mão direita
+    if resultado.right_hand_landmarks:
+
+        mp_drawing.draw_landmarks(
+            frame,
+            resultado.right_hand_landmarks,
+            mp_holistic.HAND_CONNECTIONS
+        )
+
+    # Corpo
+    if resultado.pose_landmarks:
+
+        mp_drawing.draw_landmarks(
+            frame,
+            resultado.pose_landmarks,
+            mp_holistic.POSE_CONNECTIONS
+        )
 
     return frame
 
 
+# ============================================================
+# EXTRAÇÃO DOS 225 VALORES
+# ============================================================
 
 def pegar_pontos(resultado):
+
+    if resultado is None:
+        return []
 
     pontos = []
 
 
-    if resultado.multi_hand_landmarks:
+    # --------------------------------------------------------
+    # MÃO ESQUERDA: 21 pontos × 3 = 63
+    # --------------------------------------------------------
 
-        for mao in resultado.multi_hand_landmarks:
+    if resultado.left_hand_landmarks:
 
-            for ponto in mao.landmark:
+        for ponto in resultado.left_hand_landmarks.landmark:
 
-                pontos.append(
-                    ponto.x
-                )
+            pontos.extend([
+                ponto.x,
+                ponto.y,
+                ponto.z
+            ])
 
-                pontos.append(
-                    ponto.y
-                )
+    else:
 
-                pontos.append(
-                    ponto.z
-                )
+        pontos.extend(
+            [0.0] * 63
+        )
+
+
+    # --------------------------------------------------------
+    # MÃO DIREITA: 21 pontos × 3 = 63
+    # --------------------------------------------------------
+
+    if resultado.right_hand_landmarks:
+
+        for ponto in resultado.right_hand_landmarks.landmark:
+
+            pontos.extend([
+                ponto.x,
+                ponto.y,
+                ponto.z
+            ])
+
+    else:
+
+        pontos.extend(
+            [0.0] * 63
+        )
+
+
+    # --------------------------------------------------------
+    # CORPO: 33 pontos × 3 = 99
+    # --------------------------------------------------------
+
+    if resultado.pose_landmarks:
+
+        for ponto in resultado.pose_landmarks.landmark:
+
+            pontos.extend([
+                ponto.x,
+                ponto.y,
+                ponto.z
+            ])
+
+    else:
+
+        pontos.extend(
+            [0.0] * 99
+        )
+
+
+    # Segurança: o modelo exige exatamente 225 valores
+    if len(pontos) != 225:
+
+        print(
+            f"⚠ Quantidade inválida de pontos: {len(pontos)}"
+        )
+
+        return []
 
 
     return pontos
