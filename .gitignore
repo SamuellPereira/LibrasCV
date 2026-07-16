@@ -1,27 +1,54 @@
-# Ambientes
+# ============================================================
+# Python
+# ============================================================
+
 venv/
+.venv/
 __pycache__/
-*.pyc
+*.py[cod]
 
 
+# ============================================================
+# VS Code
+# ============================================================
+
+.vscode/
+
+
+# ============================================================
+# Logs
+# ============================================================
+
+*.log
+homologacao/trainer/logs/
+
+
+# ============================================================
+# Dados do projeto (NÃO versionar)
+# ============================================================
+
+homologacao/dados/dataset/
+homologacao/dados/dataset_normalizado/
+homologacao/dados/dataset_augmented/
+homologacao/dados/dataset_camera/
 homologacao/temp/
-homologacao/dataset/
-homologacao/dataset_normalizado/
-homologacao/dataset_augmented/
+
+
+# ============================================================
+# Arquivos de treinamento
+# ============================================================
+
 homologacao/trainer/datasets/
 homologacao/trainer/modelos/
-homologacao/trainer/datasets/
-homologacao/logs/
+
+
+# ============================================================
+# Arquivos grandes
+# ============================================================
 
 *.mp4
 *.npy
 *.npz
 *.keras
 *.h5
-
-# Modelos treinados
-homologacao/trainer/modelos/
-*.npy
-*.npz
-*.keras
-*.h5
+*.ckpt

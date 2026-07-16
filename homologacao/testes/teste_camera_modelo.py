@@ -10,20 +10,35 @@ import tensorflow as tf
 
 
 # ============================================================
-# CAMINHOS
+# CAMINHOS DO PROJETO
 # ============================================================
 
-BASE_DIR = os.path.dirname(
+TESTES_DIR = os.path.dirname(
     os.path.abspath(__file__)
 )
 
+HOMOLOGACAO_DIR = os.path.dirname(
+    TESTES_DIR
+)
+
 PROJETO_DIR = os.path.dirname(
-    BASE_DIR
+    HOMOLOGACAO_DIR
 )
 
 sys.path.insert(
     0,
     PROJETO_DIR
+)
+
+sys.path.insert(
+    0,
+    HOMOLOGACAO_DIR
+)
+
+
+from config_paths import (  # noqa: E402
+    MODELO_MELHOR_PATH,
+    CLASSES_PATH
 )
 
 from src.hand_detector import (  # noqa: E402
@@ -33,24 +48,11 @@ from src.hand_detector import (  # noqa: E402
 )
 
 
-MODELO_PATH = os.path.join(
-    BASE_DIR,
-    "trainer",
-    "modelos",
-    "librai_v1_melhor.keras"
-)
-
-CLASSES_PATH = os.path.join(
-    BASE_DIR,
-    "trainer",
-    "datasets",
-    "classes.json"
-)
-
-
 # ============================================================
 # CONFIGURAÇÕES
 # ============================================================
+
+MODELO_PATH = MODELO_MELHOR_PATH
 
 TOTAL_FRAMES = 60
 DIMENSAO_FRAME = 225
@@ -59,13 +61,13 @@ CONFIANCA_MINIMA = 80.0
 
 PREDICOES_PARA_CONFIRMAR = 5
 
-INTERVALO_PREDICAO = 5
+INTERVALO_PREDICAO = 15
 
 MOSTRAR_TOP_5 = True
 
 
 # ============================================================
-# CARREGAMENTO
+# CARREGAMENTO DO MODELO
 # ============================================================
 
 def carregar_modelo():
@@ -73,7 +75,8 @@ def carregar_modelo():
     if not os.path.exists(MODELO_PATH):
 
         raise FileNotFoundError(
-            f"Modelo não encontrado:\n{MODELO_PATH}"
+            "Modelo não encontrado:\n"
+            f"{MODELO_PATH}"
         )
 
     print("🧠 Carregando modelo...")
@@ -87,12 +90,17 @@ def carregar_modelo():
     return modelo
 
 
+# ============================================================
+# CARREGAMENTO DAS CLASSES
+# ============================================================
+
 def carregar_classes():
 
     if not os.path.exists(CLASSES_PATH):
 
         raise FileNotFoundError(
-            f"Arquivo de classes não encontrado:\n{CLASSES_PATH}"
+            "Arquivo de classes não encontrado:\n"
+            f"{CLASSES_PATH}"
         )
 
     with open(
@@ -115,7 +123,66 @@ def carregar_classes():
 
 
 # ============================================================
-# DESENHO
+# ABERTURA DA CÂMERA
+# ============================================================
+
+def abrir_camera():
+
+    print("📷 Procurando uma câmera disponível...")
+
+    # Testa alguns índices automaticamente.
+    for indice in range(4):
+
+        print(
+            f"   Tentando câmera {indice}..."
+        )
+
+        camera = cv2.VideoCapture(
+            indice,
+            cv2.CAP_DSHOW
+        )
+
+        if not camera.isOpened():
+
+            camera.release()
+
+            camera = cv2.VideoCapture(
+                indice
+            )
+
+        if camera.isOpened():
+
+            sucesso, frame = camera.read()
+
+            if sucesso and frame is not None:
+
+                print(
+                    f"✅ Câmera {indice} aberta!"
+                )
+
+                camera.set(
+                    cv2.CAP_PROP_FRAME_WIDTH,
+                    640
+                )
+
+                camera.set(
+                    cv2.CAP_PROP_FRAME_HEIGHT,
+                    480
+                )
+
+                return camera
+
+        camera.release()
+
+    raise RuntimeError(
+        "Nenhuma câmera disponível foi encontrada.\n"
+        "Feche OBS, Teams, Discord, navegador e o aplicativo "
+        "Câmera do Windows e tente novamente."
+    )
+
+
+# ============================================================
+# DESENHO DE TEXTO
 # ============================================================
 
 def desenhar_texto(
@@ -149,6 +216,10 @@ def desenhar_texto(
     )
 
 
+# ============================================================
+# PAINEL DA INTERFACE
+# ============================================================
+
 def desenhar_painel(
     frame,
     palavra,
@@ -158,14 +229,14 @@ def desenhar_painel(
     top_5
 ):
 
-    altura_painel = 230 if MOSTRAR_TOP_5 else 135
+    altura_painel = 245 if MOSTRAR_TOP_5 else 155
 
     overlay = frame.copy()
 
     cv2.rectangle(
         overlay,
         (10, 10),
-        (500, altura_painel),
+        (620, altura_painel),
         (20, 20, 20),
         -1
     )
@@ -181,7 +252,7 @@ def desenhar_painel(
 
     desenhar_texto(
         frame,
-        f"Frames: {quantidade_frames}/{TOTAL_FRAMES}",
+        f"Buffer: {quantidade_frames}/{TOTAL_FRAMES}",
         (25, 40),
         0.65
     )
@@ -198,15 +269,14 @@ def desenhar_painel(
         desenhar_texto(
             frame,
             f"Palavra: {palavra.upper()}",
-            (25, 110),
-            0.9,
-            2
+            (25, 115),
+            0.9
         )
 
         desenhar_texto(
             frame,
             f"Confianca: {confianca:.2f}%",
-            (25, 145),
+            (25, 150),
             0.7
         )
 
@@ -214,9 +284,9 @@ def desenhar_painel(
 
         desenhar_texto(
             frame,
-            "Aguardando movimento...",
-            (25, 110),
-            0.75
+            "Aguardando reconhecimento...",
+            (25, 115),
+            0.7
         )
 
     if MOSTRAR_TOP_5 and top_5:
@@ -224,24 +294,29 @@ def desenhar_painel(
         desenhar_texto(
             frame,
             "Top 5:",
-            (25, 180),
+            (25, 185),
             0.6
         )
 
-        texto_top = " | ".join(
-            [
-                f"{nome}: {valor:.1f}%"
-                for nome, valor in top_5
-            ]
-        )
+        for posicao, (
+            nome,
+            valor
+        ) in enumerate(
+            top_5,
+            start=1
+        ):
 
-        desenhar_texto(
-            frame,
-            texto_top[:75],
-            (25, 210),
-            0.45,
-            1
-        )
+            linha = 185 + (
+                posicao * 11
+            )
+
+            desenhar_texto(
+                frame,
+                f"{posicao}. {nome}: {valor:.1f}%",
+                (120, linha),
+                0.38,
+                1
+            )
 
 
 # ============================================================
@@ -259,10 +334,17 @@ def prever(
         dtype=np.float32
     )
 
-    if entrada.shape != (
+    formato_esperado = (
         TOTAL_FRAMES,
         DIMENSAO_FRAME
-    ):
+    )
+
+    if entrada.shape != formato_esperado:
+
+        print(
+            "⚠ Formato inválido:",
+            entrada.shape
+        )
 
         return None, 0.0, []
 
@@ -277,34 +359,50 @@ def prever(
     )[0]
 
     indice = int(
-        np.argmax(probabilidades)
+        np.argmax(
+            probabilidades
+        )
     )
 
-    palavra = classes[indice]
+    palavra = classes[
+        indice
+    ]
 
     confianca = float(
-        probabilidades[indice] * 100
+        probabilidades[indice]
+        * 100
     )
 
     indices_top = np.argsort(
         probabilidades
     )[-5:][::-1]
 
-    top_5 = [
-        (
-            classes[int(indice_classe)],
-            float(
-                probabilidades[indice_classe] * 100
+    top_5 = []
+
+    for indice_classe in indices_top:
+
+        top_5.append(
+            (
+                classes[
+                    int(indice_classe)
+                ],
+                float(
+                    probabilidades[
+                        indice_classe
+                    ] * 100
+                )
             )
         )
-        for indice_classe in indices_top
-    ]
 
-    return palavra, confianca, top_5
+    return (
+        palavra,
+        confianca,
+        top_5
+    )
 
 
 # ============================================================
-# EXECUÇÃO
+# PROGRAMA PRINCIPAL
 # ============================================================
 
 def main():
@@ -313,36 +411,17 @@ def main():
     print("🤟 LibrAI - Teste com Webcam")
     print("=" * 60)
 
+    print("\n1️⃣ Carregando modelo...")
+
     modelo = carregar_modelo()
+
+    print("\n2️⃣ Carregando classes...")
 
     classes = carregar_classes()
 
-    camera = cv2.VideoCapture(
-        0,
-        cv2.CAP_DSHOW
-    )
+    print("\n3️⃣ Abrindo câmera...")
 
-    if not camera.isOpened():
-
-        camera = cv2.VideoCapture(
-            0
-        )
-
-    if not camera.isOpened():
-
-        raise RuntimeError(
-            "Não foi possível abrir a câmera."
-        )
-
-    camera.set(
-        cv2.CAP_PROP_FRAME_WIDTH,
-        1280
-    )
-
-    camera.set(
-        cv2.CAP_PROP_FRAME_HEIGHT,
-        720
-    )
+    camera = abrir_camera()
 
     sequencia = deque(
         maxlen=TOTAL_FRAMES
@@ -354,19 +433,17 @@ def main():
 
     palavra_confirmada = None
     confianca_confirmada = 0.0
-
     top_5_atual = []
 
     contador_frames = 0
 
     tempo_anterior = time.time()
-
     fps = 0.0
 
     print()
-    print("✅ Webcam iniciada.")
+    print("✅ LibrAI iniciado!")
     print("ESC = sair")
-    print("R = limpar buffer")
+    print("R = limpar o buffer")
     print()
 
     while True:
@@ -375,7 +452,11 @@ def main():
 
         if not sucesso:
 
-            print("❌ Erro ao ler a câmera.")
+            print(
+                "❌ Não foi possível ler "
+                "o frame da câmera."
+            )
+
             break
 
         frame = cv2.flip(
@@ -387,29 +468,58 @@ def main():
             frame
         )
 
+        pontos = pegar_pontos(
+            resultado
+        )
+
         frame = desenhar_mao(
             frame,
             resultado
         )
 
-        pontos = pegar_pontos(
-            resultado
+        mao_esquerda = (
+            resultado is not None
+            and resultado.left_hand_landmarks is not None
         )
 
-        if len(pontos) == DIMENSAO_FRAME:
+        mao_direita = (
+            resultado is not None
+            and resultado.right_hand_landmarks is not None
+        )
+
+        tem_mao = mao_esquerda or mao_direita
+
+
+        if tem_mao and len(pontos) == DIMENSAO_FRAME:
 
             sequencia.append(
                 pontos
             )
 
-        contador_frames += 1
+        else:
+
+            sequencia.clear()
+            historico_predicoes.clear()
+
+            palavra_confirmada = None
+            confianca_confirmada = 0.0
+            top_5_atual = []
+
+        contador_frames =2
 
         if (
-            len(sequencia) == TOTAL_FRAMES
-            and contador_frames % INTERVALO_PREDICAO == 0
+            len(sequencia)
+            == TOTAL_FRAMES
+            and contador_frames
+            % INTERVALO_PREDICAO
+            == 0
         ):
 
-            palavra, confianca, top_5 = prever(
+            (
+                palavra,
+                confianca,
+                top_5
+            ) = prever(
                 modelo,
                 classes,
                 list(sequencia)
@@ -417,17 +527,25 @@ def main():
 
             top_5_atual = top_5
 
-            if confianca >= CONFIANCA_MINIMA:
+            if (
+                palavra is not None
+                and confianca
+                >= CONFIANCA_MINIMA
+            ):
 
                 historico_predicoes.append(
                     palavra
                 )
 
                 if (
-                    len(historico_predicoes)
+                    len(
+                        historico_predicoes
+                    )
                     == PREDICOES_PARA_CONFIRMAR
                     and len(
-                        set(historico_predicoes)
+                        set(
+                            historico_predicoes
+                        )
                     ) == 1
                 ):
 
@@ -447,7 +565,10 @@ def main():
 
         tempo_atual = time.time()
 
-        intervalo = tempo_atual - tempo_anterior
+        intervalo = (
+            tempo_atual
+            - tempo_anterior
+        )
 
         if intervalo > 0:
 
@@ -459,7 +580,9 @@ def main():
             frame=frame,
             palavra=palavra_confirmada,
             confianca=confianca_confirmada,
-            quantidade_frames=len(sequencia),
+            quantidade_frames=len(
+                sequencia
+            ),
             fps=fps,
             top_5=top_5_atual
         )
@@ -487,18 +610,21 @@ def main():
             historico_predicoes.clear()
 
             palavra_confirmada = None
-
             confianca_confirmada = 0.0
-
             top_5_atual = []
 
-            print("🔄 Buffer limpo.")
-
+            print(
+                "🔄 Buffer limpo."
+            )
 
     camera.release()
 
     cv2.destroyAllWindows()
 
+
+# ============================================================
+# INICIALIZAÇÃO
+# ============================================================
 
 if __name__ == "__main__":
 
@@ -509,5 +635,7 @@ if __name__ == "__main__":
     except Exception as erro:
 
         print()
-        print("❌ Erro:")
+        print("=" * 60)
+        print("❌ ERRO NO LIBRAI")
+        print("=" * 60)
         print(erro)
